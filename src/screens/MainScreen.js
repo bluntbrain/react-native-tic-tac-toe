@@ -6,80 +6,89 @@ import {
   StyleSheet,
   Text,
   View,
+  ActivityIndicator,
 } from 'react-native';
 import React, {useState, useEffect} from 'react';
 
 import zeroImage from '../assets/images/zero.png';
 import crossImage from '../assets/images/cross.png';
 import resetimage from '../assets/images/reset.png';
+import {
+  calculateWinner,
+  createGame,
+  updateCurrentState,
+} from '../utils/network';
 const windowWidth = Dimensions.get('window').width;
 
-export default function MainScreen() {
-  const [currentTurn, setCurrentTurn] = useState('X');
-  const [boxes, setboxes] = useState([
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-  ]);
 
-  const markPosition = position => {
-    if (!boxes[position]) {
-      let temp = [...boxes];
-      temp[position] = currentTurn;
-      setboxes(temp);
-      if (currentTurn === 'X') {
-        //transfer chances to next player
-        setCurrentTurn('O');
-      } else {
-        setCurrentTurn('X');
-      }
-    }
-  };
+export default function MainScreen() {
+  const [boxes, setboxes] = useState(null);
+  // const [currentTurn, _switch] = switchTurn();
+  const [currentTurn, setCurrentTurn]= useState('X');
+  const [isLoading, setIsLoading]= useState(true);
+
+  const [roomId, setRoomId] = useState(null);
 
   const resetboxes = () => {
-    setboxes([null, null, null, null, null, null, null, null, null]);
+    // create game api to reset and create a new game
+    createGame().then(res => {
+      console.log('new game created ===', res);
+      setRoomId(res._id);
+      setboxes(res.currentState);
+    });
+    setboxes(initialState);
   };
 
-  const calculateWinner = squares => {
-    const lines = [
-      [0, 1, 2],
-      [3, 4, 5],
-      [6, 7, 8],
-      [0, 3, 6],
-      [1, 4, 7],
-      [2, 5, 8],
-      [0, 4, 8],
-      [2, 4, 6],
-    ];
-    for (let i = 0; i < lines.length; i++) {
-      const [a, b, c] = lines[i];
-      if (
-        squares[a] &&
-        squares[a] === squares[b] &&
-        squares[a] === squares[c]
-      ) {
-        return squares[a];
-      }
-    }
-    return null;
+  const markPosition = position => {
+    // call api to update the boxes
+    updateCurrentState(position, roomId).then(res => {
+      setboxes(res?.currentState);
+      setCurrentTurn(res?.currentTurn)
+    });
   };
 
   useEffect(() => {
-    const winner = calculateWinner(boxes);
-    if (winner === 'X') {
-      alert('Player X Wins!');
-      resetboxes();
-    } else if (winner === 'O') {
-      alert('Player O Wins!');
-      resetboxes();
-    }
+    // api call to calculate winner
+    calculateWinner(roomId).then(res => {
+      let winner = res
+      if (winner === 'X') {
+        alert('Player X Wins!');
+        resetboxes();
+      } else if (winner === 'O') {
+        alert('Player O Wins!');
+        resetboxes();
+      } else {
+        if (!boxes?.includes(null) && !isLoading) {
+          alert("Opps it's a tie!");
+        }
+      }
+    })
+    
   }, [boxes]);
+
+  // useEffect(() => {
+  //   // call api to get current state
+  //   // set current state to usestate
+  // }, [currentTurn]);
+
+  useEffect(() => {
+    setTimeout(() => {
+      setIsLoading(false)
+    }, 1000);
+    createGame().then(res => {
+      console.log('new game created ===', res);
+      setRoomId(res._id);
+      setboxes(res.currentState);
+    });
+  }, []);
+  
+  if(isLoading){
+    return(
+      <View style={{justifyContent:'center', marginTop:300}}>
+        <ActivityIndicator color={'#000000'} size={'large'}/>
+      </View>
+    )
+  }
 
   return (
     <SafeAreaView style={styles.body}>
